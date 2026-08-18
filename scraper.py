@@ -1,3 +1,5 @@
+from urllib import parse
+
 import requests
 from bs4 import BeautifulSoup
 from time import sleep
@@ -6,19 +8,29 @@ import sys
 import pandas as pd
 
 BASE_URL = "https://news.ycombinator.com/"
-OUTPUT_CSV = "HN_output.csv"
-OUTPUT_XLSX = "HN_output.xlsx"
-REQUEST_DELAY = 2  # seconds between pages; HN throttles hard below this
+
+DEFAULT_OUTPUT = "HN_output"
+
+REQUEST_DELAY = 2  # seconds between pages; 
 
 headers = {
-    "User-Agent": "Mozilla/5.0 (educational scraping project; contact: your-email@example.com)"
+    "User-Agent": "Mozilla/5.0 (educational scraping project; contact: mateusfelipe.do.nascimento@gmail.com)"
 }
 data = []
 
 parser = argparse.ArgumentParser(description="Scrape Hacker News")
+
 parser.add_argument("--start", type=int, default=1, help="First page to scrape, 1-indexed (default: 1)")
 parser.add_argument("--stop", type=int, default=3, help="Last page to scrape, inclusive (default: 3)")
+parser.add_argument("--output-name", type=str, default=DEFAULT_OUTPUT, 
+                    help=f"Base name for output files (default: {DEFAULT_OUTPUT})")
 args = parser.parse_args()
+
+# Define os nomes dos arquivos baseado no argumento
+output_csv = f"{args.output_name}.csv"
+output_excel = f"{args.output_name}.xlsx"
+
+print(f"Output files: {output_csv} and {output_excel}")
 
 # HN pages are 1-indexed: ?p=1 is ranks 1-30, ?p=2 is 31-60, and so on.
 # ?p=0 is not "page zero" -- HN answers it with HTTP 429, so it only ever
@@ -95,9 +107,9 @@ for current_page in range(args.start, args.stop + 1):
         sleep(REQUEST_DELAY)
 
 df = pd.DataFrame(data)
-df.to_csv(OUTPUT_CSV, index=False)
-df.to_excel(OUTPUT_XLSX, index=False)
-print(f"Wrote {len(df)} rows to {OUTPUT_CSV} and {OUTPUT_XLSX}.")
+df.to_csv(output_csv, index=False)
+df.to_excel(output_csv, index=False)
+print(f"Wrote {len(df)} rows to {output_csv} and {output_csv}.")
 
 # A dropped page silently shrinks the dataset, which is exactly what makes a
 # short scrape look like a comparison bug later. Say so, and exit non-zero.

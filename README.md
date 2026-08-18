@@ -28,7 +28,7 @@ caught on the next run instead of six weeks later.
 ## Install
 
 ```bash
-pip install requests beautifulsoup4 lxml pandas openpyxl
+pip install -r requirements.txt
 ```
 
 Tested on Python 3.14 with requests 2.33, bs4 4.14, pandas 3.0, openpyxl 3.1.
@@ -128,6 +128,18 @@ measure. Adjust `REQUEST_DELAY` upward for larger crawls.
 Hacker News publishes an [official API](https://github.com/HackerNews/API) — for
 production use, prefer it. This project scrapes deliberately, as a demonstration of
 extraction and validation technique.
+
+---
+
+## Why this project exists
+
+Most scraping tutorials stop at "it prints a CSV." This project goes one step further:
+it **proves** the scraper is correct. The comparator is the real value here. It shows
+that I don't just write code that "seems to work" — I write code that can verify itself
+against an independent source of truth.
+
+This is the same mindset required for QA and backend engineering: building systems that
+are testable, observable, and self-validating.
 
 ---
 

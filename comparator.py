@@ -1,3 +1,8 @@
+# This comparator exists to prove that the scraper works.
+# It pulls the same data from the official API and diffs it against our scrape.
+# A successful run shows 100% match. This is how we catch markup changes early.
+
+
 import argparse
 import html
 import requests
