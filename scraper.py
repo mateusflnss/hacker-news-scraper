@@ -5,13 +5,21 @@ from bs4 import BeautifulSoup
 from time import sleep
 import argparse
 import sys
+from datetime import datetime
 import pandas as pd
+from crud import add_story
+from db import engine, init_db
+from model import Story
+from sqlmodel import Session
+
+init_db()
+
 
 BASE_URL = "https://news.ycombinator.com/"
 
 DEFAULT_OUTPUT = "HN_output"
 
-REQUEST_DELAY = 2  # seconds between pages; 
+REQUEST_DELAY = 31  # seconds between pages; 
 
 headers = {
     "User-Agent": "Mozilla/5.0 (educational scraping project; contact: mateusfelipe.do.nascimento@gmail.com)"
@@ -21,7 +29,7 @@ data = []
 parser = argparse.ArgumentParser(description="Scrape Hacker News")
 
 parser.add_argument("--start", type=int, default=1, help="First page to scrape, 1-indexed (default: 1)")
-parser.add_argument("--stop", type=int, default=3, help="Last page to scrape, inclusive (default: 3)")
+parser.add_argument("--stop", type=int, default=200, help="Last page to scrape, inclusive (default: 3)")
 parser.add_argument("--output-name", type=str, default=DEFAULT_OUTPUT, 
                     help=f"Base name for output files (default: {DEFAULT_OUTPUT})")
 args = parser.parse_args()
@@ -58,6 +66,7 @@ def parse_data(response):
     items = soup.select("tr.athing")
     thisData = []
     for item in items:
+        hn_id = item.get("id", "")
         title_tag = item.select_one("span.titleline a")
         title = title_tag.get_text(strip=True) if title_tag else ""
         link = title_tag["href"] if title_tag else ""
@@ -65,7 +74,9 @@ def parse_data(response):
         next_item = item.find_next_sibling("tr")
         points = next_item.select_one("span.score").get_text(strip=True).split()[0] if next_item.select_one("span.score") else "0"
         author = next_item.select_one("a.hnuser").get_text(strip=True) if next_item.select_one("a.hnuser") else ""
-        age = next_item.select_one("span.age").get_text(strip=True) if next_item.select_one("span.age") else ""
+        age_tag = next_item.select_one("span.age")
+        age = age_tag.get_text(strip=True) if age_tag else ""
+        scraped_at = datetime.now().isoformat()
 
 
         comments_tag = None
@@ -80,12 +91,14 @@ def parse_data(response):
         comments_text = comments_tag.get_text(strip=True) if comments_tag else ""
         comments_amount = comments_text.split()[0] if comments_text and comments_text != "discuss" else "0"
         thisData.append({
+            "hn_id": hn_id,
             "title": title,
             "link": link,
             "domain": domain,
             "points": points,
             "author": author,
             "age": age,
+            "scraped_at": scraped_at,
             "comments_link": comments_link,
             "comments_text": comments_text,
             "comments_amount": comments_amount
@@ -94,12 +107,44 @@ def parse_data(response):
 
 failed_pages = []
 
+
+def parse_scraped_at(value: str) -> datetime:
+    # HN stores "ISO_DATE UNIX_TS" in the title attribute; keep only ISO part.
+    iso_part = (value or "").split()[0]
+    if not iso_part:
+        raise ValueError("missing scraped_at value")
+    return datetime.fromisoformat(iso_part)
+
+def store_in_db(data):
+    with Session(engine) as session:
+        for item in data:
+            story = Story(
+                hn_id=int(item["hn_id"]),
+                title=item["title"],
+                url=item["link"],
+                domain=item["domain"],
+                points=int(item["points"]),
+                author=item["author"],
+                age=item["age"],
+                comments_link=item["comments_link"],
+                comments_text=item["comments_text"],
+                comments_amount=int(item["comments_amount"]),
+                scraped_at=parse_scraped_at(item["scraped_at"])
+            )
+            added_story = add_story(session, story)
+            if added_story is None:
+                print(f"Failed to add story with hn_id {item['hn_id']} to the database.")
+
+
+
 for current_page in range(args.start, args.stop + 1):
     try:
         response = fetch_page(current_page)
         thisData = parse_data(response)
         print(f"Scraped page {current_page} with {len(thisData)} items.")
         data.extend(thisData)
+
+        store_in_db(thisData)  
     except requests.RequestException as e:
         print(f"Failed on page {current_page}: {e}")
         failed_pages.append(current_page)
@@ -108,8 +153,8 @@ for current_page in range(args.start, args.stop + 1):
 
 df = pd.DataFrame(data)
 df.to_csv(output_csv, index=False)
-df.to_excel(output_csv, index=False)
-print(f"Wrote {len(df)} rows to {output_csv} and {output_csv}.")
+df.to_excel(output_excel, index=False)
+print(f"Wrote {len(df)} rows to {output_csv} and {output_excel}.")
 
 # A dropped page silently shrinks the dataset, which is exactly what makes a
 # short scrape look like a comparison bug later. Say so, and exit non-zero.
