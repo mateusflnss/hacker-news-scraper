@@ -34,10 +34,22 @@ def get_story(story_id: int,
               session: Session = Depends(get_session),
 
               ):
+    item = session.get(Story, story_id)   # PK lookup, returns Story | None
+    if not item:
+        raise HTTPException(status_code=404, detail=f"no story with id {story_id}")
+    return item
+
+
+
+@app.get("/stories/by-hn-id/{hn_id}")
+def get_story_hn(hn_id: int,
+              session: Session = Depends(get_session),
+
+              ):
     query = select(Story)
-    query = query.where(Story.hn_id == story_id)
-    item = session.exec(query).all()
+    query = query.where(Story.hn_id == hn_id)
+    item = session.exec(query).first()
     if item == None:
-        raise HTTPException(status_code = 404, detail={"message" : f"no item with {story_id} id"})
+        raise HTTPException(status_code = 404, detail={"message" : f"no item with {hn_id} id"})
 
     return item
