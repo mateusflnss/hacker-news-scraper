@@ -53,3 +53,14 @@ def get_story_hn(hn_id: int,
         raise HTTPException(status_code = 404, detail={"message" : f"no item with {hn_id} id"})
 
     return item
+
+
+@app.get("/domains")
+def get_domains(
+    session: Session = Depends(get_session),
+    limit: int = Query(default=50, le=200),
+    offset: int = 0,):
+    query = select(Story.domain)
+    query = query.distinct()
+    query = query.limit(limit).offset(offset)
+    return session.exec(query).all()
