@@ -1,6 +1,7 @@
 from crud import (add_story, add_stories_batch, get_stories,
                    get_story_by_id, get_story_by_hn_id, fetch_distinct_domains, fetch_top_domains)
 from db import engine, init_db, get_session
+from schemas import StoryCreate
 from model import Story
 from sqlmodel import Session, select
 from fastapi import FastAPI, Depends, Query, HTTPException
@@ -66,7 +67,7 @@ def get_top_domains(
 
 
 
-@app.post("/stories")
-def post_stories(
-    session: Session = Depends(get_session),
-):
+
+@app.post("/stories/batch")
+def post_stories(stories: list[StoryCreate], session: Session = Depends(get_session)):
+    return add_stories_batch(session, [s.model_dump() for s in stories])
