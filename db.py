@@ -3,9 +3,11 @@ import os
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 
-
-engine = create_engine("sqlite:///hn.db")
-
+if DATABASE_URL:
+    engine = create_engine(DATABASE_URL)
+else:
+     engine = create_engine("sqlite:///hn.db")
+    
 def init_db() -> None:
     """
     Initializes the database by creating all tables defined in the SQLModel metadata.
