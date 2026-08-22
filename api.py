@@ -6,15 +6,26 @@ from model import Story
 from sqlmodel import Session, select
 from fastapi import FastAPI, Depends, Query, HTTPException
 from sqlalchemy import func
-
+import os
+from dotenv import load_dotenv
+from fastapi.security import APIKeyHeader
 
 init_db()
+
 
 app = FastAPI(title="Hacker News Data Pipeline API",
     description="REST API for accessing scraped Hacker News stories. Supports filtering, pagination, and batch insertion.",
     version="1.0.0"
 )
 
+load_dotenv()
+API_SECRET_KEY = os.getenv("API_KEY")
+api_key_header = APIKeyHeader(name="X_API_Key", auto_error=False)
+
+async def verify_api_key(api_key: str = Depends(api_key_header)):
+    if not api_key or api_key != API_SECRET_KEY:
+        raise HTTPException(status_code=403, detail="invalid or missing API Key")
+    return True
 
 
 @app.get("/stories/")
@@ -136,7 +147,7 @@ def get_top_domains(
 
 
 @app.post("/stories/batch")
-def post_stories(stories: list[StoryCreate], session: Session = Depends(get_session)):
+async def post_stories(stories: list[StoryCreate], session: Session = Depends(get_session), _: bool = Depends(verify_api_key)):
     """
     Add multiple stories to the database in a single batch request.
 
@@ -155,4 +166,5 @@ def post_stories(stories: list[StoryCreate], session: Session = Depends(get_sess
             - errors: List of error messages for skipped items (empty list if none).
     
     """
+    
     return add_stories_batch(session, [s.model_dump() for s in stories])

@@ -119,7 +119,7 @@ failed_pages = []
 
 def post_data(stories_batch):
     post_headers = {"X_API_Key": API_SECRET_KEY} if API_SECRET_KEY else {}
-    response = requests.post("http://localhost:8000/stories/batch/", json=stories_batch, headers=post_headers)
+    response = requests.post("https://hn-data-pipeline.onrender.com/stories/batch", json=stories_batch, headers=post_headers)
 
     if response.status_code == 200:
         print("batch sent successfully")
