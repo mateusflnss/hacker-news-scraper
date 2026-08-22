@@ -51,10 +51,42 @@ Full request/response schemas are available in the auto-generated OpenAPI docs a
 ├── scraper.py      # HN scraper (feeds the batch endpoint)
 ├── conftest.py     # Shared pytest fixtures (test DB + client)
 ├── test_stories.py # API integration tests
+├── compose.yaml    # Docker Compose config for local development
+├── Dockerfile      # Docker image build instructions
 └── requirements.txt
 ```
 
 ## Running locally
+
+### Option 1: Using Docker Compose
+
+This is the easiest way to run the API locally.
+
+```bash
+# 1. Clone and enter the project
+git clone https://github.com/mateusflnss/hn-data-pipeline.git
+cd hn-data-pipeline
+
+# 2. Set environment variables (see .env.example)
+#    API_KEY       — key required by the batch insertion endpoint
+#    DATABASE_URL  — optional; defaults to local SQLite (hn.db)
+
+# 3. Start the API in a Docker container
+docker compose up --build
+```
+
+
+### Option 2: Using Docker (API only)
+
+If you want to run only the API container (e.g., connecting to an external PostgreSQL):
+```bash
+docker pull ghcr.io/mateusflnss/hn-data-pipeline:latest
+docker run -p 8000:8000 ghcr.io/mateusflnss/hn-data-pipeline:latest
+```
+
+### Option 3: Without Docker (Python virtual environment)
+
+Requirements: Python 3.14+, pip, and PostgreSQL (optional).
 
 ```bash
 # 1. Clone and enter the project
