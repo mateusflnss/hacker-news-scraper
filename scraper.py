@@ -11,6 +11,12 @@ from crud import add_story
 from db import engine, init_db
 from model import Story
 from sqlmodel import Session
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+API_SECRET_KEY = os.getenv("API_KEY")
+
 
 init_db()
 
@@ -28,10 +34,13 @@ data = []
 
 parser = argparse.ArgumentParser(description="Scrape Hacker News")
 
-parser.add_argument("--start", type=int, default=1, help="First page to scrape, 1-indexed (default: 1)")
+parser.add_argument("--start", type=int, default=3, help="First page to scrape, 1-indexed (default: 1)")
 parser.add_argument("--stop", type=int, default=200, help="Last page to scrape, inclusive (default: 3)")
 parser.add_argument("--output-name", type=str, default=DEFAULT_OUTPUT, 
                     help=f"Base name for output files (default: {DEFAULT_OUTPUT})")
+parser.add_argument("--output-csv", type=bool, default=False, help=f"Whether to output CSV file (default: False)")
+parser.add_argument("--output-excel", type=bool, default=False, help=f"Whether to output Excel file (default: False)")
+
 args = parser.parse_args()
 
 # Define os nomes dos arquivos baseado no argumento
@@ -93,7 +102,7 @@ def parse_data(response):
         thisData.append({
             "hn_id": hn_id,
             "title": title,
-            "link": link,
+            "url": link,
             "domain": domain,
             "points": points,
             "author": author,
@@ -108,33 +117,16 @@ def parse_data(response):
 failed_pages = []
 
 
-def parse_scraped_at(value: str) -> datetime:
-    # HN stores "ISO_DATE UNIX_TS" in the title attribute; keep only ISO part.
-    iso_part = (value or "").split()[0]
-    if not iso_part:
-        raise ValueError("missing scraped_at value")
-    return datetime.fromisoformat(iso_part)
+def post_data(stories_batch):
+    post_headers = {"X_API_Key": API_SECRET_KEY} if API_SECRET_KEY else {}
+    response = requests.post("http://localhost:8000/stories/batch/", json=stories_batch, headers=post_headers)
 
-def store_in_db(data):
-    with Session(engine) as session:
-        for item in data:
-            story = Story(
-                hn_id=int(item["hn_id"]),
-                title=item["title"],
-                url=item["link"],
-                domain=item["domain"],
-                points=int(item["points"]),
-                author=item["author"],
-                age=item["age"],
-                comments_link=item["comments_link"],
-                comments_text=item["comments_text"],
-                comments_amount=int(item["comments_amount"]),
-                scraped_at=parse_scraped_at(item["scraped_at"])
-            )
-            added_story = add_story(session, story)
-            if added_story is None:
-                print(f"Failed to add story with hn_id {item['hn_id']} to the database.")
-
+    if response.status_code == 200:
+        print("batch sent successfully")
+    else:
+        print(f"failed to send batch. Status : {response.status_code}")
+        print(response.text)
+    return response
 
 
 for current_page in range(args.start, args.stop + 1):
@@ -144,18 +136,20 @@ for current_page in range(args.start, args.stop + 1):
         print(f"Scraped page {current_page} with {len(thisData)} items.")
         data.extend(thisData)
 
-        store_in_db(thisData)  
+        post_data(thisData)  
     except requests.RequestException as e:
         print(f"Failed on page {current_page}: {e}")
         failed_pages.append(current_page)
     if current_page < args.stop:
         sleep(REQUEST_DELAY)
 
-df = pd.DataFrame(data)
-df.to_csv(output_csv, index=False)
-df.to_excel(output_excel, index=False)
-print(f"Wrote {len(df)} rows to {output_csv} and {output_excel}.")
-
+if (args.output_csv or args.output_excel) and data:
+    df = pd.DataFrame(data)
+    if args.output_csv:
+        df.to_csv(output_csv, index=False)
+    if args.output_excel:
+        df.to_excel(output_excel, index=False)
+    
 # A dropped page silently shrinks the dataset, which is exactly what makes a
 # short scrape look like a comparison bug later. Say so, and exit non-zero.
 if failed_pages:
